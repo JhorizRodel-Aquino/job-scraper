@@ -10,7 +10,16 @@ from typing import Optional
 
 import typer
 
-from job_scraper.db import DEFAULT_DB_PATH, get_connection, init_db, query_jobs
+from job_scraper.classify import classify_sub_role
+from job_scraper.db import (
+    DEFAULT_DB_PATH,
+    compute_job_id,
+    get_connection,
+    init_db,
+    query_jobs,
+    upsert_job,
+)
+from job_scraper.models import Job
 from job_scraper.pipeline import run as run_pipeline
 
 app = typer.Typer(help="Scheduled crawler for software engineering job postings.")
@@ -30,6 +39,35 @@ def scrape(
     typer.echo(f"Stored/updated {total} relevant jobs:")
     for source, count in counts.items():
         typer.echo(f"  {source}: {count}")
+
+
+@app.command()
+def ingest(
+    url: str = typer.Argument(..., help="Job posting URL you found manually."),
+    db_path: Path = typer.Option(DEFAULT_DB_PATH, help="Path to the SQLite database."),
+) -> None:
+    """Scrape a single job posting URL (schema.org JobPosting data) and store it.
+
+    No relevance/location filtering — you already chose this specific
+    posting by pasting its URL, so it's stored as-is (sub_role is still
+    classified from the title for consistent querying).
+    """
+    from job_scraper.ingest import fetch_job_posting
+
+    raw = fetch_job_posting(url)
+    if raw is None:
+        typer.echo("Could not extract job data from that URL.", err=True)
+        raise typer.Exit(code=1)
+
+    job = Job(**raw.model_dump(), id=compute_job_id(raw), sub_role=classify_sub_role(raw.title))
+
+    conn = get_connection(db_path)
+    init_db(conn)
+    upsert_job(conn, job)
+    conn.commit()
+    conn.close()
+
+    typer.echo(f"Stored: [{job.sub_role}] {job.title} @ {job.company}")
 
 
 def _row_to_dict(row) -> dict:

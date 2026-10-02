@@ -1,86 +1,96 @@
 import httpx
 import respx
 
-from job_scraper.sources import arbeitnow, remoteok
+from job_scraper.sources import greenhouse, jooble, lever
 
 
 @respx.mock
-def test_remoteok_fetch_parses_jobs_and_skips_legal_notice() -> None:
-    respx.get(remoteok.API_URL).mock(
+def test_jooble_fetch_parses_jobs(monkeypatch) -> None:
+    monkeypatch.setenv("JOOBLE_API_KEY", "test-key")
+    respx.post(url__regex=r"^https://jooble\.org/api/.*").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "jobs": [
+                    {
+                        "id": 42,
+                        "title": "Backend Developer",
+                        "company": "Acme PH",
+                        "location": "Manila, Philippines",
+                        "link": "https://jooble.org/job/42",
+                        "snippet": "desc",
+                        "updated": "2024-02-01T00:00:00",
+                    }
+                ]
+            },
+        )
+    )
+
+    jobs = jooble.fetch()
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.source == "jooble"
+    assert job.external_id == "42"
+    assert job.title == "Backend Developer"
+    assert job.company == "Acme PH"
+
+
+def test_jooble_fetch_returns_empty_without_api_key(monkeypatch) -> None:
+    monkeypatch.delenv("JOOBLE_API_KEY", raising=False)
+    assert jooble.fetch() == []
+
+
+@respx.mock
+def test_greenhouse_fetch_parses_jobs() -> None:
+    respx.get(url__regex=r"^https://boards-api\.greenhouse\.io/.*").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "jobs": [
+                    {
+                        "id": 1,
+                        "title": "Software Engineer",
+                        "location": {"name": "Remote in the Philippines"},
+                        "absolute_url": "https://job-boards.greenhouse.io/x/jobs/1",
+                        "updated_at": "2024-01-15T00:00:00Z",
+                    }
+                ]
+            },
+        )
+    )
+
+    jobs = greenhouse.fetch()
+
+    # One mocked response matches every company-board request.
+    assert len(jobs) == len(greenhouse.GREENHOUSE_COMPANIES)
+    job = jobs[0]
+    assert job.source == "greenhouse"
+    assert job.title == "Software Engineer"
+    assert job.remote is True
+    assert job.location == "Remote in the Philippines"
+
+
+@respx.mock
+def test_lever_fetch_parses_jobs() -> None:
+    respx.get(url__regex=r"^https://api\.lever\.co/.*").mock(
         return_value=httpx.Response(
             200,
             json=[
-                {"legal": "some notice, not a job"},
                 {
-                    "id": "111",
-                    "position": "Backend Engineer",
-                    "company": "Acme",
-                    "location": "Worldwide",
-                    "url": "https://remoteok.com/l/111",
-                    "date": "2024-01-15T00:00:00+00:00",
-                },
+                    "id": "abc",
+                    "text": "Senior Full-Stack Developer",
+                    "categories": {"location": "Makati City, Metro Manila"},
+                    "hostedUrl": "https://jobs.lever.co/x/abc",
+                    "createdAt": 1700000000000,
+                }
             ],
         )
     )
 
-    jobs = remoteok.fetch()
+    jobs = lever.fetch()
 
-    assert len(jobs) == 1
     job = jobs[0]
-    assert job.source == "remoteok"
-    assert job.external_id == "111"
-    assert job.title == "Backend Engineer"
-    assert job.company == "Acme"
-    assert job.remote is True
-    assert job.posted_date is not None
-
-
-@respx.mock
-def test_arbeitnow_fetch_follows_pagination() -> None:
-    page1 = {
-        "data": [
-            {
-                "slug": "job-1",
-                "title": "Frontend Engineer",
-                "company_name": "Beta",
-                "location": "Berlin",
-                "remote": False,
-                "url": "https://arbeitnow.com/job-1",
-                "created_at": 1700000000,
-            }
-        ],
-        "links": {"next": "https://www.arbeitnow.com/api/job-board-api?page=2"},
-    }
-    page2 = {
-        "data": [
-            {
-                "slug": "job-2",
-                "title": "DevOps Engineer",
-                "company_name": "Gamma",
-                "location": "Remote",
-                "remote": True,
-                "url": "https://arbeitnow.com/job-2",
-                "created_at": 1700000001,
-            }
-        ],
-        "links": {"next": None},
-    }
-
-    # A single route with sequential side effects, since respx matches on
-    # path and ignores query strings unless `params=` is given explicitly —
-    # two separately-registered routes for `...` and `...?page=2` would both
-    # match the same requests and the first one registered would win for
-    # every call, looping forever on page1's `next` link.
-    respx.get(url__regex=r"^https://www\.arbeitnow\.com/api/job-board-api").mock(
-        side_effect=[
-            httpx.Response(200, json=page1),
-            httpx.Response(200, json=page2),
-        ]
-    )
-
-    jobs = arbeitnow.fetch()
-
-    assert len(jobs) == 2
-    assert {job.external_id for job in jobs} == {"job-1", "job-2"}
-    remote_job = next(job for job in jobs if job.external_id == "job-2")
-    assert remote_job.remote is True
+    assert job.source == "lever"
+    assert job.title == "Senior Full-Stack Developer"
+    assert job.location == "Makati City, Metro Manila"

@@ -17,11 +17,11 @@ it defaults to `jobs.db` in the repo root.
 
 ## `scrape`
 
-Fetches every configured source (Greenhouse, Lever, Ashby, RemoteOK,
-WeWorkRemotely, Arbeitnow, USAJobs), filters to relevant software engineering
-roles, classifies sub-role, and upserts into the database. Safe to run
-repeatedly — matching postings are deduped and just get their `last_seen_at`
-bumped rather than duplicated.
+Fetches every configured source (Jooble, Greenhouse, Lever), filters to
+relevant software engineering roles located in the Philippines, classifies
+sub-role, and upserts into the database. Safe to run repeatedly — matching
+postings are deduped and just get their `last_seen_at` bumped rather than
+duplicated.
 
 ```powershell
 python -m job_scraper scrape
@@ -31,6 +31,35 @@ python -m job_scraper scrape --db-path D:\data\jobs.db
 Prints a per-source count of jobs stored/updated. A source that fails (rate
 limit, network error, etc.) is skipped for that run rather than aborting the
 whole scrape — its count shows `0`.
+
+---
+
+## `ingest`
+
+Scrapes a single job posting URL you found manually (e.g. browsing LinkedIn
+yourself) and stores it. Parses the `schema.org JobPosting` JSON-LD the page
+embeds for Google Jobs indexing — works for any site using that markup, not
+just LinkedIn.
+
+```powershell
+python -m job_scraper ingest "<job posting URL>"
+python -m job_scraper ingest "<job posting URL>" --db-path D:\data\jobs.db
+```
+
+No relevance or PH-location filtering is applied — pasting the URL *is* the
+filter, since you already chose that specific posting. `sub_role` is still
+classified from the title for consistent querying.
+
+Sites that block a plain HTTP request (confirmed: Jobstreet, Indeed) need
+the optional Playwright fallback:
+
+```powershell
+pip install -e ".[browser]"
+playwright install chromium
+```
+
+Without it, those URLs fail with "Could not extract job data from that
+URL."
 
 ---
 
@@ -104,6 +133,7 @@ python -m job_scraper export --output devops_recent.csv --role devops --since 7
 ```powershell
 python -m job_scraper --help
 python -m job_scraper scrape --help
+python -m job_scraper ingest --help
 python -m job_scraper query --help
 python -m job_scraper export --help
 ```

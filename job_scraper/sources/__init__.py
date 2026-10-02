@@ -1,19 +1,3 @@
-from job_scraper.sources import (
-    arbeitnow,
-    ashby,
-    greenhouse,
-    lever,
-    remoteok,
-    usajobs,
-    weworkremotely,
-)
+from job_scraper.sources import greenhouse, jooble, lever
 
-ALL_SOURCES = [
-    remoteok,
-    arbeitnow,
-    greenhouse,
-    lever,
-    ashby,
-    weworkremotely,
-    usajobs,
-]
+ALL_SOURCES = [jooble, greenhouse, lever]

@@ -1,7 +1,8 @@
 """Greenhouse — per-company job board API, no auth.
 
 Not a global search: each company publishes its own board. The list of
-tracked companies lives in config.GREENHOUSE_COMPANIES.
+tracked companies lives in config.GREENHOUSE_COMPANIES, limited to companies
+confirmed to post Philippines-located jobs.
 """
 
 from __future__ import annotations

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from job_scraper.classify import classify_sub_role, is_relevant
+from job_scraper.classify import classify_sub_role, is_philippines, is_relevant
 from job_scraper.db import compute_job_id, upsert_job
 from job_scraper.models import Job, RawJob
 from job_scraper.sources import ALL_SOURCES
@@ -12,6 +12,8 @@ from job_scraper.sources import ALL_SOURCES
 
 def normalize_and_classify(raw: RawJob) -> Job | None:
     if not raw.title or not is_relevant(raw.title):
+        return None
+    if not is_philippines(raw.location):
         return None
     return Job(
         **raw.model_dump(),

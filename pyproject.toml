@@ -16,6 +16,12 @@ dev = [
     "pytest>=8.0",
     "respx>=0.21",
 ]
+browser = [
+    "playwright>=1.40",
+]
+ui = [
+    "streamlit>=1.38",
+]
 
 [project.scripts]
 job-scraper = "job_scraper.cli:app"

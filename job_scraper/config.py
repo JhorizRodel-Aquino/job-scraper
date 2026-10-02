@@ -88,32 +88,41 @@ DEFAULT_SUB_ROLE = "other"
 # by default in query/export (still kept in the DB, just filtered out).
 STALE_AFTER_DAYS = 14
 
-# Greenhouse board tokens (boards-api.greenhouse.io/v1/boards/{token}/jobs).
-# Starter list of well-known companies on the platform; expand over time.
+# A job's location must match one of these (case-insensitive substring) to
+# be considered Philippines-based. Company ATS boards list PH postings as a
+# city/province without the word "Philippines" (e.g. "Clark, Pampanga"), so
+# this needs the major cities/provinces, not just the country name.
+PH_LOCATION_KEYWORDS = [
+    "philippines",
+    "manila",
+    "makati",
+    "quezon city",
+    "taguig",
+    "pasig",
+    "bgc",
+    "cebu",
+    "davao",
+    "clark",
+    "pampanga",
+    "iloilo",
+    "baguio",
+    "cavite",
+    "laguna",
+    "bulacan",
+    "angeles city",
+]
+
+# Greenhouse board tokens confirmed (by manual check) to currently post jobs
+# located in the Philippines.
 GREENHOUSE_COMPANIES = [
-    "stripe",
-    "airbnb",
-    "robinhood",
-    "doordash",
-    "coinbase",
-    "asana",
-    "gitlab",
-    "figma",
+    "hellofresh",
+    "5ca",
+    "cteph",
+    "wundermanthompson",
 ]
 
-# Lever site tokens (api.lever.co/v0/postings/{token}).
+# Lever site tokens confirmed to currently post jobs located in the
+# Philippines.
 LEVER_COMPANIES = [
-    "netflix",
-    "shopify",
-    "palantir",
-    "plaid",
-    "brex",
-]
-
-# Ashby job-board names (api.ashbyhq.com/posting-api/job-board/{name}).
-ASHBY_COMPANIES = [
-    "ramp",
-    "linear",
-    "notion",
-    "vercel",
+    "Aprio",
 ]

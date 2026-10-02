@@ -1,25 +1,75 @@
 # Job Scraper
 
 A scheduled crawler that collects software engineering job postings (frontend,
-backend, full-stack, devops, mobile) from free API/feed sources into a local
-SQLite database, with a CLI to query and export what it finds.
+backend, full-stack, devops, mobile) in the **Philippines** from free API/feed
+sources into a local SQLite database, with a CLI to query and export what it
+finds.
 
 Standalone project — not wired into any other app's database.
 
 ## Sources (v1)
 
-API/feed-based sources only, no anti-bot scraping:
+API/feed-based sources only, no anti-bot scraping. Every job, regardless of
+source, is also checked against `config.PH_LOCATION_KEYWORDS`
+(`classify.is_philippines`) and dropped if its location doesn't look
+Philippines-based — company boards below post globally, this is what keeps
+the DB PH-only.
 
-- [Greenhouse](https://boards-api.greenhouse.io) — per-company boards (seed list in `job_scraper/config.py`)
-- [Lever](https://api.lever.co) — per-company boards
-- [Ashby](https://api.ashbyhq.com) — per-company boards
-- [RemoteOK](https://remoteok.com/api) — global remote listings
-- [WeWorkRemotely](https://weworkremotely.com) — RSS feeds (programming, devops/sysadmin)
-- [Arbeitnow](https://www.arbeitnow.com/api/job-board-api) — global listings
-- [USAJobs](https://developer.usajobs.gov/) — US federal jobs (requires a free API key)
+- [Jooble](https://jooble.org/api/about) — job aggregator API, queried scoped
+  to `location: "Philippines"` (requires a free API key)
+- [Greenhouse](https://boards-api.greenhouse.io) — per-company boards, limited
+  to companies confirmed to post PH jobs (seed list in `job_scraper/config.py`)
+- [Lever](https://api.lever.co) — per-company boards, same PH-confirmed-only
+  seeding
 
-LinkedIn/Indeed/Glassdoor-style scraping of anti-bot-defended sites is
-deliberately out of scope for v1 — see `HANDOFF.md` for the tradeoff.
+Other candidate sources (Ashby per-company boards, RemoteOK, WeWorkRemotely,
+Arbeitnow, USAJobs, Adzuna) were evaluated and dropped: no PH-posting company
+was found on Ashby, the others are globally-scoped aggregators with no way
+to filter to PH, and Adzuna/USAJobs don't cover PH at all.
+
+LinkedIn/Indeed/Glassdoor-style *automated crawling* of those sites is
+deliberately out of scope — see `HANDOFF.md` for the tradeoff. What's in
+scope instead is manual, single-URL ingestion (see `ingest` below): you find
+a posting yourself, paste its URL, the tool captures the structured data.
+
+## Manual ingestion (`ingest`)
+
+```powershell
+.\.venv\Scripts\python -m job_scraper ingest "<job posting URL>"
+```
+
+Parses the `schema.org JobPosting` JSON-LD block the page embeds for Google
+Jobs indexing — not site-specific, works for anything using that markup.
+Confirmed working (tested live) for LinkedIn's public guest job pages, no
+login required. Jobstreet and Indeed block even a single plain request
+(Cloudflare-style bot protection) — `ingest` falls back to a real headless
+browser via Playwright for those, but it's not installed by default:
+
+```powershell
+.\.venv\Scripts\pip install -e ".[browser]"
+.\.venv\Scripts\playwright install chromium
+```
+
+Without that extra installed, sites that block plain requests simply fail
+to ingest ("Could not extract job data from that URL").
+
+Unlike `scrape`, `ingest` does **not** filter by relevance or PH location —
+you already chose that specific posting by pasting its URL, so it's stored
+as-is (sub_role is still classified from the title for consistent
+querying).
+
+## UI
+
+A local browser UI over the same database — a sortable table (title,
+company, sub-role, location, link, last seen), click a row to see the full
+scraped description, plus the same paste-a-URL ingest box as the CLI.
+
+```powershell
+.\.venv\Scripts\pip install -e ".[ui]"
+.\.venv\Scripts\streamlit run job_scraper/ui.py
+```
+
+Opens at http://localhost:8501.
 
 ## Setup
 
@@ -28,10 +78,10 @@ python -m venv .venv
 .\.venv\Scripts\pip install -e ".[dev]"
 ```
 
-USAJobs is optional; without it that source is silently skipped. To enable it,
-copy `.env.example` to `.env` and fill in `USAJOBS_API_KEY` /
-`USAJOBS_USER_AGENT` (your registered email) from
-https://developer.usajobs.gov/apirequest/.
+Jooble is optional; without `JOOBLE_API_KEY` that source is silently skipped
+(Greenhouse/Lever need no key and still run). To enable Jooble, copy
+`.env.example` to `.env` and fill in the key from
+https://jooble.org/api/about.
 
 ## Usage
 
@@ -70,12 +120,15 @@ yourself from an elevated PowerShell prompt:
 1. Add a module under `job_scraper/sources/` exposing `NAME: str` and
    `fetch() -> list[RawJob]` (see `job_scraper/sources/base.py`).
 2. Register it in `job_scraper/sources/__init__.py`'s `ALL_SOURCES` list.
-3. If it's a per-company board API (like Greenhouse/Lever/Ashby), add a
-   company seed list to `job_scraper/config.py`.
+3. If it's a per-company board API (like Greenhouse/Lever), manually check
+   the board actually has PH postings before seeding the company into
+   `job_scraper/config.py` — `pipeline.normalize_and_classify` will filter
+   non-PH jobs out regardless, but there's no point fetching companies with
+   zero PH postings.
 
 ## Roadmap
 
 - FastAPI read endpoint over the same SQLite DB (deferred until the CLI
   pipeline is validated against real data).
-- Revisit scraping harder, anti-bot-defended sites (LinkedIn, Indeed,
-  Glassdoor) explicitly, site by site.
+- Revisit scraping harder, anti-bot-defended sites (LinkedIn, Jobstreet,
+  Indeed, Glassdoor) explicitly, site by site.

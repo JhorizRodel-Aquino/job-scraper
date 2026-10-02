@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
-from job_scraper.config import DEFAULT_SUB_ROLE, GENERAL_SWE_KEYWORDS, SUB_ROLE_KEYWORDS
+from job_scraper.config import (
+    DEFAULT_SUB_ROLE,
+    GENERAL_SWE_KEYWORDS,
+    PH_LOCATION_KEYWORDS,
+    SUB_ROLE_KEYWORDS,
+)
 
 
 def is_relevant(title: str) -> bool:
     """True if the title looks like a software engineering role at all."""
     lowered = title.lower()
     return any(keyword in lowered for keyword in GENERAL_SWE_KEYWORDS)
+
+
+def is_philippines(location: str | None) -> bool:
+    """True if the location string looks Philippines-based."""
+    if not location:
+        return False
+    lowered = location.lower()
+    return any(keyword in lowered for keyword in PH_LOCATION_KEYWORDS)
 
 
 def classify_sub_role(title: str) -> str:

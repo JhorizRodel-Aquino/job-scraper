@@ -1,6 +1,6 @@
 import pytest
 
-from job_scraper.classify import classify_sub_role, is_relevant
+from job_scraper.classify import classify_sub_role, is_philippines, is_relevant
 
 
 @pytest.mark.parametrize(
@@ -38,3 +38,20 @@ def test_classify_sub_role(title: str, expected_role: str) -> None:
 def test_devops_wins_over_backend_when_both_present() -> None:
     # "Backend DevOps Engineer" contains both, devops keywords are checked first.
     assert classify_sub_role("Backend DevOps Engineer") == "devops"
+
+
+@pytest.mark.parametrize(
+    "location,expected",
+    [
+        ("Manila, Philippines", True),
+        ("Remote in the Philippines", True),
+        ("Clark, Pampanga", True),  # city/province with no literal "Philippines"
+        ("Makati City, Metro Manila", True),
+        ("Remote - Malaysia; Remote - Philippines", True),
+        ("Austin, TX", False),
+        (None, False),
+        ("", False),
+    ],
+)
+def test_is_philippines(location: str | None, expected: bool) -> None:
+    assert is_philippines(location) is expected
